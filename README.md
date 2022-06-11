@@ -1,4 +1,4 @@
-# @marijn/buildtool
+# Forked from @marijn/buildtool
 
 Utility to build TypeScript projects that conform to a given set of
 conventions quickly and cleanly. Exports functions that wrap the

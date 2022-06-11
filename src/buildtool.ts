@@ -9,7 +9,7 @@ import {recursive} from "acorn-walk"
 const pkgCache: {[main: string]: Package} = Object.create(null)
 
 function tsFiles(dir: string) {
-  return fs.readdirSync(dir).filter(f => /(?<!\.d)\.ts$/.test(f)).map(f => join(dir, f))
+  return fs.readdirSync(dir).filter(f => /(?<!\.d)\.(ts|tsx)$/.test(f)).map(f => join(dir, f))
 }
 
 /// Options passed to `build` or `watch`.
@@ -81,7 +81,7 @@ function configFor(pkgs: readonly Package[], extra: readonly string[] = [], opti
   let {sourceMap, tsOptions} = options
   return {
     compilerOptions: {paths, ...tsDefaultOptions, ...tsOptions, sourceMap: !!sourceMap, inlineSources: sourceMap},
-    include: pkgs.reduce((ds, p) => ds.concat(p.dirs.map(d => join(d, "*.ts"))), [] as string[])
+    include: pkgs.reduce((ds, p) => ds.concat(p.dirs.map(d => join(d, "**/*"))), [] as string[])
       .concat(extra).map(normalize)
   }
 }
@@ -137,8 +137,29 @@ function runTS(dirs: readonly string[], tsconfig: any, options: BuildOptions) {
   host.readFile = readAndMangleComments(dirs, options)
   let program = ts.createProgram({rootNames: config.fileNames, options: config.options, host})
   let out = new Output, result = program.emit(undefined, out.write)
+
+  if (result.diagnostics.length>0) {
+    console.log('--\n')
+    result.diagnostics.forEach(r => reportDiagnostic(r))
+    console.log('--\n')
+  } else {
+    console.log('no ts errors')
+  }
   return result.emitSkipped ? null : out
 }
+
+function reportDiagnostic(diagnostic: ts.Diagnostic) {
+  console.log(
+    "TS Error",
+    diagnostic.code,
+    ":",
+    ts.flattenDiagnosticMessageText(
+      diagnostic.messageText,
+      ts.sys.newLine
+    )
+  );
+}
+
 
 const tsFormatHost = {
   getCanonicalFileName: (path: string) => path,
@@ -165,7 +186,9 @@ function watchTS(dirs: readonly string[], tsconfig: any, options: BuildOptions) 
   return out
 }
 
-function external(id: string) { return id != "tslib" && !/^(\.?\/|\w:)/.test(id) }
+function external(id: string) {
+  return id != "tslib" && !/^(\.?\/|\w:)/.test(id) 
+}
 
 function outputPlugin(output: Output, ext: string, base: Plugin) {
   let {resolveId, load} = base
@@ -181,7 +204,7 @@ function outputPlugin(output: Output, ext: string, base: Plugin) {
       let code = output.get(file)
       return code ? {code, map: output.get(file + '.map')} : (load && load.call(this, file))
     }
-  } as Plugin
+  } as Plugin;
 }
 
 const pure = "/*@__PURE__*/"
@@ -253,6 +276,10 @@ async function bundle(pkg: Package, compiled: Output, options: BuildOptions) {
     plugins: [
       outputPlugin(compiled, ".js", base)
     ]
+    ,
+    onwarn: (warning, warn) => {
+      warn(warning)
+    }
   })
   let dist = join(pkg.root, "dist")
   // makePure set to false when generating source map since this manipulates output after source map is generated
