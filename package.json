@@ -1,6 +1,6 @@
 {
   "name": "buildtool-bangle",
-  "version": "0.1.2",
+  "version": "0.0.1",
   "description": "Tool for building TypeScript packages",
   "author": {
     "name": "Marijn Haverbeke",
